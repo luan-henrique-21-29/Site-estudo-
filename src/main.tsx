@@ -8,6 +8,7 @@ import './salaries.css'
 import './playground.css'
 import './career-salaries.css'
 import './focus.css'
+import './cities.css'
 
 createRoot(document.getElementById('root')!).render(<StrictMode><AppStateProvider><App/></AppStateProvider></StrictMode>)
 
