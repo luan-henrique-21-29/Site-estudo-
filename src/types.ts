@@ -5,6 +5,8 @@ export type Priority = 'low' | 'normal' | 'high'
 export interface SourceRef {
   label: string
   url: string
+  sourceName?: string
+  publishedAt?: string
   retrievedAt?: string
 }
 
@@ -94,6 +96,7 @@ export interface Goal {
   priority?: Priority
   notes?: string
   subtasks?: GoalSubtask[]
+  updatedAt?: string
 }
 
 export interface UserSettings {
@@ -140,7 +143,7 @@ export interface StudySession {
 
 export interface RecentItem {
   id: string
-  type: 'lesson' | 'country' | 'city' | 'career' | 'tool' | 'note'
+  type: 'lesson' | 'country' | 'city' | 'career' | 'tool' | 'note' | 'english-lab' | 'portfolio'
   title: string
   path: string
   viewedAt: string
@@ -184,13 +187,76 @@ export interface Highlight {
   createdAt: string
 }
 
+export interface SearchHistoryItem {
+  query: string
+  searchedAt: string
+}
+
+export interface ResumePoint {
+  path: string
+  title?: string
+  lessonId?: string
+  sectionId?: string
+  scrollY: number
+  exerciseId?: string
+  flashcardId?: string
+  updatedAt: string
+}
+
+export interface FinancialPlan {
+  monthlyIncome: number
+  fixedExpenses: number
+  variableExpenses: number
+  savedAmount: number
+  goalAmount: number
+  monthlyContribution: number
+  goalName: string
+  updatedAt: string
+}
+
+export interface FinancialHistoryEntry {
+  id: string
+  month: string
+  netWorth: number
+  savedAmount?: number
+  createdAt: string
+}
+
+export interface PortfolioProject {
+  id: string
+  name: string
+  description: string
+  technologies: string[]
+  imageUrl?: string
+  githubUrl?: string
+  demoUrl?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlaygroundState {
+  html: string
+  css: string
+  javascript: string
+  updatedAt: string
+}
+
+export interface CodeChallengeProgress {
+  challengeId: string
+  code: string
+  completedAt?: string
+  updatedAt: string
+}
+
 export interface AppData {
+  version: number
   onboardingDone: boolean
   displayName: string
   preferences: OnboardingPreferences
   favorites: string[]
   completed: Record<string, { completedAt: string; difficulty: Difficulty; reviewStage?: number; nextReviewAt?: string }>
   notes: Record<string, string>
+  noteUpdatedAt: Record<string, string>
   noteTags: Record<string, string[]>
   favoriteNotes: string[]
   goals: Goal[]
@@ -198,6 +264,7 @@ export interface AppData {
   studyMinutes: number
   studySessions: StudySession[]
   recent: RecentItem[]
+  searchHistory: SearchHistoryItem[]
   quizAttempts: QuizAttempt[]
   flashcardReviews: Record<string, FlashcardReview>
   notebooks: NotebookDocument[]
@@ -205,8 +272,15 @@ export interface AppData {
   researchedCountries: string[]
   visitedCountries: string[]
   researchedCities: string[]
+  financialPlan: FinancialPlan
+  financialHistory: FinancialHistoryEntry[]
+  portfolioProjects: PortfolioProject[]
+  playgroundState: PlaygroundState
+  codeChallengeProgress: Record<string, CodeChallengeProgress>
   lastVisitedPath: string
   lastLessonId?: string
+  resumePoint: ResumePoint
+  settingsUpdatedAt: string
   updatedAt: string
   settings: UserSettings
 }
