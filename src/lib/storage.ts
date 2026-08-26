@@ -65,6 +65,8 @@ export const defaultData: AppData = {
   researchedCountries: [],
   visitedCountries: [],
   researchedCities: [],
+  cityCosts: {},
+  countryCompareWeights: { salary: 8, safety: 9, climate: 5, language: 8, immigration: 9, cost: 8 },
   financialPlan: {
     monthlyIncome: 0,
     fixedExpenses: 0,
@@ -116,6 +118,8 @@ export function normalizeStoredData(parsed: Partial<AppData>): AppData {
     researchedCountries: parsed.researchedCountries ?? [],
     visitedCountries: parsed.visitedCountries ?? [],
     researchedCities: parsed.researchedCities ?? [],
+    cityCosts: parsed.cityCosts ?? {},
+    countryCompareWeights: { ...base.countryCompareWeights, ...(parsed.countryCompareWeights ?? {}) },
     financialPlan: { ...base.financialPlan, ...(parsed.financialPlan ?? {}) },
     financialHistory: parsed.financialHistory ?? [],
     portfolioProjects: parsed.portfolioProjects ?? [],
@@ -156,7 +160,7 @@ export function saveSafetyBackup(data: AppData, label = 'cloud-merge') {
 }
 
 export function hasMeaningfulLocalProgress(data: AppData) {
-  return Object.keys(data.completed).length > 0 || Object.keys(data.notes).some(key => data.notes[key]?.trim()) || data.studyMinutes > 0 || data.notebooks.length > 0 || data.portfolioProjects.length > 0 || data.financialHistory.length > 0
+  return Object.keys(data.completed).length > 0 || Object.keys(data.notes).some(key => data.notes[key]?.trim()) || data.studyMinutes > 0 || data.notebooks.length > 0 || data.portfolioProjects.length > 0 || data.financialHistory.length > 0 || Object.keys(data.cityCosts).length > 0
 }
 
 export function exportData(data: AppData) {
