@@ -1,59 +1,41 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AppData,
+  CodeChallengeProgress,
   CourseId,
   Difficulty,
+  FinancialHistoryEntry,
+  FinancialPlan,
   Goal,
   Highlight,
   NotebookDocument,
   OnboardingPreferences,
+  PortfolioProject,
   QuizAttempt,
   RecentItem,
+  ResumePoint,
   UserSettings
 } from '../types'
-import { defaultData, loadData, saveData } from '../lib/storage'
+import { defaultData, hasMeaningfulLocalProgress, loadData, normalizeStoredData, saveData, saveSafetyBackup } from '../lib/storage'
+import { mergeAppData } from '../lib/mergeAppData'
 import { loadCloudSnapshot, saveCloudSnapshot } from '../services/cloudSync'
 import { useAuth } from './useAuth'
 
 const reviewIntervals = [1, 3, 7, 14, 30, 60]
 const plusDays = (iso: string, days: number) => new Date(new Date(iso).getTime() + days * 86_400_000).toISOString()
 const firstReviewDays = (difficulty: Difficulty) => difficulty === 'hard' ? 1 : difficulty === 'easy' ? 7 : 3
-const timeValue = (iso?: string) => iso ? Date.parse(iso) || 0 : 0
 
-type SyncStatus = 'local' | 'connecting' | 'pending' | 'synced' | 'error'
-
-function normalizeData(next: Partial<AppData>): AppData {
-  return {
-    ...structuredClone(defaultData),
-    ...next,
-    preferences: { ...defaultData.preferences, ...(next.preferences ?? {}) },
-    settings: { ...defaultData.settings, ...(next.settings ?? {}) },
-    favorites: next.favorites ?? [],
-    completed: next.completed ?? {},
-    notes: next.notes ?? {},
-    noteTags: next.noteTags ?? {},
-    favoriteNotes: next.favoriteNotes ?? [],
-    goals: (next.goals ?? defaultData.goals).map(goal => ({ ...goal, priority: goal.priority ?? 'normal', subtasks: goal.subtasks ?? [] })),
-    relocationChecklist: next.relocationChecklist ?? {},
-    studySessions: next.studySessions ?? [],
-    recent: next.recent ?? [],
-    quizAttempts: next.quizAttempts ?? [],
-    flashcardReviews: next.flashcardReviews ?? {},
-    notebooks: next.notebooks ?? [],
-    highlights: next.highlights ?? [],
-    researchedCountries: next.researchedCountries ?? [],
-    visitedCountries: next.visitedCountries ?? [],
-    researchedCities: next.researchedCities ?? [],
-    lastVisitedPath: next.lastVisitedPath ?? '/',
-    updatedAt: next.updatedAt ?? ''
-  }
-}
+type SyncStatus = 'local' | 'connecting' | 'pending' | 'synced' | 'offline' | 'migration' | 'paused' | 'error'
+type MigrationChoice = 'sync' | 'separate' | 'cloud'
 
 interface AppStateValue {
   data: AppData
   syncStatus: SyncStatus
   lastSyncAt?: string
+  migrationNeeded: boolean
+  migrationRemoteExists: boolean
   syncNow: () => Promise<void>
+  resolveMigration: (choice: MigrationChoice) => Promise<void>
   setOnboarding: (name: string) => void
   completeOnboarding: (name: string, preferences: OnboardingPreferences) => void
   updateProfile: (name: string, preferences: Partial<OnboardingPreferences>) => void
@@ -71,6 +53,8 @@ interface AppStateValue {
   toggleRelocationStep: (step: string) => void
   addStudyMinutes: (minutes: number, course?: CourseId, lessonId?: string) => void
   recordRecent: (item: Omit<RecentItem, 'viewedAt'>) => void
+  recordSearch: (query: string) => void
+  clearSearchHistory: () => void
   recordQuizAttempt: (attempt: Omit<QuizAttempt, 'completedAt'>) => void
   reviewFlashcard: (cardId: string, difficulty: Difficulty) => void
   saveNotebook: (doc: NotebookDocument) => void
@@ -81,20 +65,33 @@ interface AppStateValue {
   toggleVisitedCountry: (id: string) => void
   markCityResearched: (id: string) => void
   setLastVisitedPath: (path: string, lessonId?: string) => void
+  setResumePoint: (point: Partial<ResumePoint> & Pick<ResumePoint, 'path'>) => void
+  updateFinancialPlan: (patch: Partial<FinancialPlan>) => void
+  addFinancialHistory: (entry: FinancialHistoryEntry) => void
+  removeFinancialHistory: (id: string) => void
+  savePortfolioProject: (project: PortfolioProject) => void
+  deletePortfolioProject: (id: string) => void
+  savePlaygroundState: (patch: Partial<AppData['playgroundState']>) => void
+  saveCodeChallengeProgress: (progress: CodeChallengeProgress) => void
   replaceData: (data: AppData) => void
   resetData: () => void
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null)
+const migrationKey = (userId: string) => `futuro-lab-sync-choice:${userId}`
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const { user, configured } = useAuth()
   const [data, setData] = useState<AppData>(() => loadData())
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local')
   const [lastSyncAt, setLastSyncAt] = useState<string>()
+  const [migrationNeeded, setMigrationNeeded] = useState(false)
+  const [migrationRemoteExists, setMigrationRemoteExists] = useState(false)
   const dataRef = useRef(data)
   const remoteReady = useRef(false)
   const ignoreNextPush = useRef(false)
+  const paused = useRef(false)
+  const remoteCache = useRef<AppData | null>(null)
 
   useEffect(() => { dataRef.current = data }, [data])
   useEffect(() => saveData(data), [data])
@@ -103,7 +100,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setData(current => {
       const next = updater(current)
       if (next === current) return current
-      return { ...next, updatedAt: new Date().toISOString() }
+      return { ...next, version: Math.max(2, next.version ?? 2), updatedAt: new Date().toISOString() }
     })
   }, [])
 
@@ -132,42 +129,115 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', s.background)
   }, [data.settings])
 
-  const pullOrPush = useCallback(async (force = false) => {
+  const performSync = useCallback(async (force = false) => {
     if (!user || !configured) return
+    if (!navigator.onLine) {
+      setSyncStatus('offline')
+      return
+    }
+    if (paused.current && !force) {
+      setSyncStatus('paused')
+      return
+    }
+    if (force) {
+      paused.current = false
+      localStorage.removeItem(migrationKey(user.id))
+    }
     setSyncStatus('connecting')
     try {
       const remote = await loadCloudSnapshot(user.id)
+      remoteCache.current = remote?.data ? normalizeStoredData(remote.data) : null
       const local = dataRef.current
-      if (remote && timeValue(remote.updatedAt || remote.data.updatedAt) > timeValue(local.updatedAt)) {
-        ignoreNextPush.current = true
-        const normalized = normalizeData(remote.data)
-        setData(normalized)
-        dataRef.current = normalized
-      } else if (force || !remote || timeValue(local.updatedAt) >= timeValue(remote.updatedAt)) {
+      const choice = localStorage.getItem(migrationKey(user.id))
+
+      if (!remote && hasMeaningfulLocalProgress(local) && !choice && !remoteReady.current) {
+        setMigrationRemoteExists(false)
+        setMigrationNeeded(true)
+        setSyncStatus('migration')
+        return
+      }
+
+      if (choice === 'separate') {
+        paused.current = true
+        setSyncStatus('paused')
+        return
+      }
+
+      if (remote) {
+        const merged = mergeAppData(local, remote.data)
+        if (JSON.stringify(merged) !== JSON.stringify(local)) {
+          saveSafetyBackup(local, 'before-cloud-merge')
+          ignoreNextPush.current = true
+          setData(merged)
+          dataRef.current = merged
+        }
+        await saveCloudSnapshot(user.id, merged)
+      } else {
         await saveCloudSnapshot(user.id, local)
       }
+
       remoteReady.current = true
+      setMigrationNeeded(false)
       setLastSyncAt(new Date().toISOString())
       setSyncStatus('synced')
     } catch (error) {
       console.error('Futuro Lab cloud sync:', error)
-      setSyncStatus('error')
+      setSyncStatus(navigator.onLine ? 'error' : 'offline')
     }
+  }, [configured, user])
+
+  const resolveMigration = useCallback(async (choice: MigrationChoice) => {
+    if (!user || !configured) return
+    const local = dataRef.current
+    if (choice === 'separate') {
+      paused.current = true
+      localStorage.setItem(migrationKey(user.id), 'separate')
+      setMigrationNeeded(false)
+      setSyncStatus('paused')
+      return
+    }
+    if (choice === 'cloud' && remoteCache.current) {
+      saveSafetyBackup(local, 'before-cloud-restore')
+      const next = normalizeStoredData(remoteCache.current)
+      ignoreNextPush.current = true
+      setData(next)
+      dataRef.current = next
+      remoteReady.current = true
+      localStorage.setItem(migrationKey(user.id), 'cloud')
+      setMigrationNeeded(false)
+      setLastSyncAt(new Date().toISOString())
+      setSyncStatus('synced')
+      return
+    }
+    await saveCloudSnapshot(user.id, local)
+    remoteReady.current = true
+    paused.current = false
+    localStorage.setItem(migrationKey(user.id), 'sync')
+    setMigrationNeeded(false)
+    setLastSyncAt(new Date().toISOString())
+    setSyncStatus('synced')
   }, [configured, user])
 
   useEffect(() => {
     remoteReady.current = false
+    paused.current = false
+    remoteCache.current = null
+    setMigrationNeeded(false)
     if (!user || !configured) {
       setSyncStatus('local')
       return
     }
-    void pullOrPush(true)
-  }, [configured, pullOrPush, user])
+    void performSync(false)
+  }, [configured, performSync, user])
 
   useEffect(() => {
-    if (!user || !configured || !remoteReady.current) return
+    if (!user || !configured || !remoteReady.current || paused.current || migrationNeeded) return
     if (ignoreNextPush.current) {
       ignoreNextPush.current = false
+      return
+    }
+    if (!navigator.onLine) {
+      setSyncStatus('offline')
       return
     }
     setSyncStatus('pending')
@@ -178,34 +248,40 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         setSyncStatus('synced')
       } catch (error) {
         console.error('Futuro Lab cloud save:', error)
-        setSyncStatus('error')
+        setSyncStatus(navigator.onLine ? 'error' : 'offline')
       }
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [configured, data, user])
+  }, [configured, data, migrationNeeded, user])
 
   useEffect(() => {
     if (!user || !configured) return
-    const refresh = () => void pullOrPush(false)
-    const onVisibility = () => { if (document.visibilityState === 'visible') refresh() }
-    window.addEventListener('online', refresh)
-    window.addEventListener('focus', refresh)
+    const onOnline = () => void performSync(false)
+    const onOffline = () => setSyncStatus('offline')
+    const onVisibility = () => { if (document.visibilityState === 'visible' && navigator.onLine) void performSync(false) }
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('focus', onOnline)
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
-      window.removeEventListener('online', refresh)
-      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+      window.removeEventListener('focus', onOnline)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [configured, pullOrPush, user])
+  }, [configured, performSync, user])
 
   const value = useMemo<AppStateValue>(() => ({
     data,
     syncStatus,
     lastSyncAt,
-    syncNow: () => pullOrPush(true),
+    migrationNeeded,
+    migrationRemoteExists,
+    syncNow: () => performSync(true),
+    resolveMigration,
     setOnboarding: (name) => mutate(d => ({ ...d, onboardingDone: true, displayName: name.trim() })),
-    completeOnboarding: (name, preferences) => mutate(d => ({ ...d, onboardingDone: true, displayName: name.trim(), preferences, settings: { ...d.settings, defaultStudyMinutes: preferences.sessionMinutes } })),
-    updateProfile: (name, preferences) => mutate(d => ({ ...d, displayName: name.trim(), preferences: { ...d.preferences, ...preferences }, settings: preferences.sessionMinutes ? { ...d.settings, defaultStudyMinutes: preferences.sessionMinutes } : d.settings })),
+    completeOnboarding: (name, preferences) => mutate(d => ({ ...d, onboardingDone: true, displayName: name.trim(), preferences, settings: { ...d.settings, defaultStudyMinutes: preferences.sessionMinutes }, settingsUpdatedAt: new Date().toISOString() })),
+    updateProfile: (name, preferences) => mutate(d => ({ ...d, displayName: name.trim(), preferences: { ...d.preferences, ...preferences }, settings: preferences.sessionMinutes ? { ...d.settings, defaultStudyMinutes: preferences.sessionMinutes } : d.settings, settingsUpdatedAt: preferences.sessionMinutes ? new Date().toISOString() : d.settingsUpdatedAt })),
     toggleFavorite: (id) => mutate(d => ({ ...d, favorites: d.favorites.includes(id) ? d.favorites.filter(x => x !== id) : [...d.favorites, id] })),
     markCompleted: (id, difficulty = 'normal') => mutate(d => {
       const now = new Date().toISOString()
@@ -222,26 +298,33 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const now = new Date().toISOString()
       return { ...d, completed: { ...d.completed, [id]: { ...previous, difficulty, reviewStage: stage, nextReviewAt: plusDays(now, days) } } }
     }),
-    saveNote: (id, note) => mutate(d => ({ ...d, notes: { ...d.notes, [id]: note } })),
+    saveNote: (id, note) => mutate(d => ({ ...d, notes: { ...d.notes, [id]: note }, noteUpdatedAt: { ...d.noteUpdatedAt, [id]: new Date().toISOString() } })),
     setNoteTags: (id, tags) => mutate(d => ({ ...d, noteTags: { ...d.noteTags, [id]: [...new Set(tags.map(x => x.trim()).filter(Boolean))] } })),
     toggleFavoriteNote: (id) => mutate(d => ({ ...d, favoriteNotes: d.favoriteNotes.includes(id) ? d.favoriteNotes.filter(x => x !== id) : [...d.favoriteNotes, id] })),
-    updateSettings: (patch) => mutate(d => ({ ...d, settings: { ...d.settings, ...patch } })),
-    updateGoal: (goal) => mutate(d => ({ ...d, goals: d.goals.map(g => g.id === goal.id ? goal : g) })),
-    addGoal: (goal) => mutate(d => ({ ...d, goals: [...d.goals, { ...goal, priority: goal.priority ?? 'normal', subtasks: goal.subtasks ?? [] }] })),
+    updateSettings: (patch) => mutate(d => ({ ...d, settings: { ...d.settings, ...patch }, settingsUpdatedAt: new Date().toISOString() })),
+    updateGoal: (goal) => mutate(d => ({ ...d, goals: d.goals.map(g => g.id === goal.id ? { ...goal, updatedAt: new Date().toISOString() } : g) })),
+    addGoal: (goal) => mutate(d => ({ ...d, goals: [...d.goals, { ...goal, priority: goal.priority ?? 'normal', subtasks: goal.subtasks ?? [], updatedAt: new Date().toISOString() }] })),
     removeGoal: (id) => mutate(d => ({ ...d, goals: d.goals.filter(g => g.id !== id) })),
-    toggleGoalSubtask: (goalId, subtaskId) => mutate(d => ({ ...d, goals: d.goals.map(goal => goal.id !== goalId ? goal : { ...goal, subtasks: (goal.subtasks ?? []).map(task => task.id === subtaskId ? { ...task, done: !task.done } : task) }) })),
+    toggleGoalSubtask: (goalId, subtaskId) => mutate(d => ({ ...d, goals: d.goals.map(goal => goal.id !== goalId ? goal : { ...goal, updatedAt: new Date().toISOString(), subtasks: (goal.subtasks ?? []).map(task => task.id === subtaskId ? { ...task, done: !task.done } : task) }) })),
     toggleRelocationStep: (step) => mutate(d => ({ ...d, relocationChecklist: { ...d.relocationChecklist, [step]: !d.relocationChecklist[step] } })),
     addStudyMinutes: (minutes, course, lessonId) => mutate(d => {
       const safe = Math.max(0, minutes)
       if (!safe) return d
       const session = { id: `study-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, startedAt: new Date().toISOString(), minutes: safe, course, lessonId }
-      return { ...d, studyMinutes: d.studyMinutes + safe, studySessions: [...d.studySessions.slice(-499), session] }
+      return { ...d, studyMinutes: d.studyMinutes + safe, studySessions: [...d.studySessions.slice(-999), session] }
     }),
     recordRecent: (item) => mutate(d => {
       const next = { ...item, viewedAt: new Date().toISOString() }
-      return { ...d, recent: [next, ...d.recent.filter(x => !(x.type === item.type && x.id === item.id))].slice(0, 60) }
+      return { ...d, recent: [next, ...d.recent.filter(x => !(x.type === item.type && x.id === item.id))].slice(0, 80) }
     }),
-    recordQuizAttempt: (attempt) => mutate(d => ({ ...d, quizAttempts: [...d.quizAttempts.slice(-199), { ...attempt, completedAt: new Date().toISOString() }] })),
+    recordSearch: (query) => mutate(d => {
+      const value = query.trim()
+      if (!value) return d
+      const next = { query: value, searchedAt: new Date().toISOString() }
+      return { ...d, searchHistory: [next, ...d.searchHistory.filter(item => item.query.toLowerCase() !== value.toLowerCase())].slice(0, 20) }
+    }),
+    clearSearchHistory: () => mutate(d => ({ ...d, searchHistory: [] })),
+    recordQuizAttempt: (attempt) => mutate(d => ({ ...d, quizAttempts: [...d.quizAttempts.slice(-399), { ...attempt, completedAt: new Date().toISOString() }] })),
     reviewFlashcard: (cardId, difficulty) => mutate(d => {
       const previous = d.flashcardReviews[cardId]
       const repetitions = (previous?.repetitions ?? 0) + 1
@@ -250,7 +333,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (difficulty === 'hard') days = 1
       if (difficulty === 'easy') days = Math.max(days, Math.round(days * 1.5))
       const now = new Date().toISOString()
-      return { ...d, flashcardReviews: { ...d.flashcardReviews, [cardId]: { cardId, difficulty, reviewedAt: now, nextReviewAt: plusDays(now, days), repetitions } } }
+      return { ...d, resumePoint: { ...d.resumePoint, flashcardId: cardId, updatedAt: now }, flashcardReviews: { ...d.flashcardReviews, [cardId]: { cardId, difficulty, reviewedAt: now, nextReviewAt: plusDays(now, days), repetitions } } }
     }),
     saveNotebook: (doc) => mutate(d => ({ ...d, notebooks: d.notebooks.some(x => x.id === doc.id) ? d.notebooks.map(x => x.id === doc.id ? doc : x) : [doc, ...d.notebooks] })),
     deleteNotebook: (id) => mutate(d => ({ ...d, notebooks: d.notebooks.filter(x => x.id !== id) })),
@@ -260,9 +343,20 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     toggleVisitedCountry: (id) => mutate(d => ({ ...d, visitedCountries: d.visitedCountries.includes(id) ? d.visitedCountries.filter(x => x !== id) : [...d.visitedCountries, id] })),
     markCityResearched: (id) => mutate(d => ({ ...d, researchedCities: d.researchedCities.includes(id) ? d.researchedCities : [...d.researchedCities, id] })),
     setLastVisitedPath: (path, lessonId) => mutate(d => d.lastVisitedPath === path && (!lessonId || d.lastLessonId === lessonId) ? d : ({ ...d, lastVisitedPath: path, lastLessonId: lessonId ?? d.lastLessonId })),
-    replaceData: (next) => mutate(() => normalizeData(next)),
+    setResumePoint: (point) => mutate(d => {
+      const updatedAt = new Date().toISOString()
+      return { ...d, lastVisitedPath: point.path, lastLessonId: point.lessonId ?? d.lastLessonId, resumePoint: { ...d.resumePoint, ...point, updatedAt } }
+    }),
+    updateFinancialPlan: (patch) => mutate(d => ({ ...d, financialPlan: { ...d.financialPlan, ...patch, updatedAt: new Date().toISOString() } })),
+    addFinancialHistory: (entry) => mutate(d => ({ ...d, financialHistory: [...d.financialHistory.filter(x => x.id !== entry.id), entry].sort((a, b) => a.month.localeCompare(b.month)) })),
+    removeFinancialHistory: (id) => mutate(d => ({ ...d, financialHistory: d.financialHistory.filter(x => x.id !== id) })),
+    savePortfolioProject: (project) => mutate(d => ({ ...d, portfolioProjects: d.portfolioProjects.some(x => x.id === project.id) ? d.portfolioProjects.map(x => x.id === project.id ? project : x) : [project, ...d.portfolioProjects] })),
+    deletePortfolioProject: (id) => mutate(d => ({ ...d, portfolioProjects: d.portfolioProjects.filter(x => x.id !== id) })),
+    savePlaygroundState: (patch) => mutate(d => ({ ...d, playgroundState: { ...d.playgroundState, ...patch, updatedAt: new Date().toISOString() } })),
+    saveCodeChallengeProgress: (progress) => mutate(d => ({ ...d, codeChallengeProgress: { ...d.codeChallengeProgress, [progress.challengeId]: progress }, resumePoint: { ...d.resumePoint, path: '/code-challenges', updatedAt: progress.updatedAt } })),
+    replaceData: (next) => mutate(() => normalizeStoredData(next)),
     resetData: () => mutate(() => structuredClone(defaultData))
-  }), [data, lastSyncAt, mutate, pullOrPush, syncStatus])
+  }), [data, lastSyncAt, migrationNeeded, migrationRemoteExists, mutate, performSync, resolveMigration, syncStatus])
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
 }
