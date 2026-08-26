@@ -3,6 +3,7 @@ import { ArrowUpDown, ExternalLink, RefreshCw, Search, WalletCards } from 'lucid
 import { Link } from 'react-router-dom'
 import { countries } from '../data/countries'
 import { wages, type WageSystem } from '../data/wages'
+import { wageSource } from '../data/wageSourceOverrides'
 import { useFxRates } from '../hooks/useFxRates'
 import { convertNativeToBRL, formatBRL, formatMoney, hourlyEquivalent, monthlyEquivalent } from '../lib/wageMath'
 
@@ -57,7 +58,7 @@ export function SalariesPage(){
       <div className="salary-table" role="table" aria-label="Comparação de salários mínimos">
         <div className="salary-row salary-head" role="row"><span>País</span><span>Regra</span><span>Por hora</span><span>Por mês</span><span>Em reais</span><span>Fonte</span></div>
         {rows.map(({w,c})=>{
-          const hourly=hourlyEquivalent(w); const monthly=monthlyEquivalent(w)
+          const hourly=hourlyEquivalent(w); const monthly=monthlyEquivalent(w); const source=wageSource(w.countryId,w.source)
           const hBRL=convertNativeToBRL(hourly,w.currency,fx.rates); const mBRL=convertNativeToBRL(monthly,w.currency,fx.rates)
           return <article className="salary-row" role="row" key={w.countryId}>
             <div className="salary-country"><span className="salary-flag">{c!.flag}</span><div><Link to={`/countries/${c!.id}`}>{c!.name}</Link><small>{w.currency}</small></div></div>
@@ -65,7 +66,7 @@ export function SalariesPage(){
             <div><strong>{formatMoney(hourly,w.currency,w.currency==='JPY'||w.currency==='KRW'||w.currency==='HUF'?0:2)}</strong><small>{hourly==null?'não aplicável':w.hourlyOfficial===true?'oficial':'estimado/referência'}</small></div>
             <div><strong>{formatMoney(monthly,w.currency,w.currency==='JPY'||w.currency==='KRW'||w.currency==='HUF'?0:2)}</strong><small>{monthly==null?'não há valor único':w.monthlyOfficial===true&&(w.paymentsPerYear??12)===12?'oficial':'equivalente comparável'}</small></div>
             <div><strong>{mBRL!=null?formatBRL(mBRL):'—'}</strong><small>{hBRL!=null?`${formatBRL(hBRL)}/h`:'conversão indisponível'}</small></div>
-            <div className="salary-source"><a href={w.source.url} target="_blank" rel="noreferrer">Abrir fonte <ExternalLink size={13}/></a><small>Conferido {dateLabel(w.updatedAt)}</small></div>
+            <div className="salary-source"><a href={source.url} target="_blank" rel="noreferrer">Abrir fonte <ExternalLink size={13}/></a><small>Conferido {dateLabel(w.updatedAt)}</small></div>
           </article>
         })}
       </div>
