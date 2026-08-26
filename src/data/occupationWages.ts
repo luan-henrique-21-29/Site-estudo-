@@ -8,6 +8,7 @@ export interface OccupationWage {
   hourlyMedian?: number
   hourlyHigh?: number
   weeklyMedian?: number
+  weeklyAverage?: number
   monthlyLow?: number
   monthlyMedian?: number
   monthlyHigh?: number
@@ -101,7 +102,7 @@ export const occupationWages: OccupationWage[] = [
   },
   {
     id:'ie-professionals-broad', countryId:'irlanda', careerIds:['front-end','back-end','full-stack','engenharia-de-software','data-analyst','data-scientist','engenharia-civil'], occupation:'Managers, professionals and associated professionals — grupo amplo', currency:'EUR',
-    weeklyMedian:1668.71, hoursPerWeek:39, referencePeriod:'Q1 2026 (final)', updatedAt:'2026-08-25', specificity:'broad-group',
+    weeklyAverage:1668.71, hoursPerWeek:39, referencePeriod:'Q1 2026 (final)', updatedAt:'2026-08-25', specificity:'broad-group',
     note:'A CSO publica aqui média semanal de um grupo ocupacional amplo, não salário específico de programador ou engenheiro. O site identifica isso para não apresentar o valor como se fosse de uma profissão exata.',
     source:{label:'Central Statistics Office Ireland — Earnings and Labour Costs Q1/Q2 2026, Table A1',url:'https://www.cso.ie/en/releasesandpublications/ep/p-elcq/earningsandlabourcostsq12026finalq22026preliminaryestimates/'}
   }
