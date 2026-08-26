@@ -59,6 +59,8 @@ export const defaultData: AppData = {
   researchedCountries: [],
   visitedCountries: [],
   researchedCities: [],
+  lastVisitedPath: '/',
+  updatedAt: '',
   settings: defaultSettings
 }
 
@@ -87,6 +89,8 @@ export function loadData(): AppData {
       researchedCountries: parsed.researchedCountries ?? [],
       visitedCountries: parsed.visitedCountries ?? [],
       researchedCities: parsed.researchedCities ?? [],
+      lastVisitedPath: parsed.lastVisitedPath ?? '/',
+      updatedAt: parsed.updatedAt ?? '',
       settings: { ...defaultSettings, ...(parsed.settings ?? {}) }
     }
   } catch {
