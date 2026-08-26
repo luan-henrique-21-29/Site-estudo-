@@ -13,6 +13,7 @@ interface AppStateValue {
   updateSettings: (patch: Partial<UserSettings>) => void
   updateGoal: (goal: Goal) => void
   addGoal: (goal: Goal) => void
+  toggleRelocationStep: (step: string) => void
   addStudyMinutes: (minutes: number) => void
   replaceData: (data: AppData) => void
   resetData: () => void
@@ -51,8 +52,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     updateSettings: (patch) => setData(d => ({ ...d, settings: { ...d.settings, ...patch } })),
     updateGoal: (goal) => setData(d => ({ ...d, goals: d.goals.map(g => g.id === goal.id ? goal : g) })),
     addGoal: (goal) => setData(d => ({ ...d, goals: [...d.goals, goal] })),
+    toggleRelocationStep: (step) => setData(d => ({ ...d, relocationChecklist: { ...d.relocationChecklist, [step]: !d.relocationChecklist[step] } })),
     addStudyMinutes: (minutes) => setData(d => ({ ...d, studyMinutes: Math.max(0, d.studyMinutes + minutes) })),
-    replaceData: (next) => setData(next),
+    replaceData: (next) => setData({ ...defaultData, ...next, settings: { ...defaultData.settings, ...next.settings }, relocationChecklist: next.relocationChecklist ?? {} }),
     resetData: () => setData(structuredClone(defaultData))
   }), [data])
 
