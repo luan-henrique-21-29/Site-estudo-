@@ -205,5 +205,8 @@ export interface AppData {
   researchedCountries: string[]
   visitedCountries: string[]
   researchedCities: string[]
+  lastVisitedPath: string
+  lastLessonId?: string
+  updatedAt: string
   settings: UserSettings
 }
