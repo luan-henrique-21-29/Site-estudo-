@@ -107,7 +107,9 @@ Os testes validam os mínimos de conteúdo, integridade de quizzes, cobertura sa
 
 ## Deploy
 
-O workflow em `.github/workflows/deploy.yml` executa instalação, TypeScript/lint, testes e build. Em `main`, publica o conteúdo gerado no GitHub Pages quando o repositório está configurado para usar GitHub Actions como fonte do Pages.
+O workflow em `.github/workflows/deploy.yml` executa instalação, TypeScript/lint, testes e build. Em `main`, publica o conteúdo gerado no GitHub Pages.
+
+Para esse workflow publicar o `dist` do Vite, a fonte do GitHub Pages precisa estar configurada como **GitHub Actions** em `Settings → Pages → Build and deployment → Source`. Se estiver em **Deploy from a branch**, o Pages apenas copia/processa os arquivos-fonte do repositório e não executa o build do Vite.
 
 ## Estrutura
 
