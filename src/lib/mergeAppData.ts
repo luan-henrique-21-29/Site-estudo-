@@ -1,4 +1,4 @@
-import type { AppData, FinancialHistoryEntry, Goal, NotebookDocument, PortfolioProject, RecentItem, StudySession } from '../types'
+import type { AppData, CityCostProfile, FinancialHistoryEntry, Goal, NotebookDocument, PortfolioProject, RecentItem, StudySession } from '../types'
 import { normalizeStoredData } from './storage'
 
 const stamp = (value?: string) => value ? Date.parse(value) || 0 : 0
@@ -45,6 +45,15 @@ function mergePortfolio(a: PortfolioProject[], b: PortfolioProject[]) {
 
 function mergeFinancialHistory(a: FinancialHistoryEntry[], b: FinancialHistoryEntry[]) {
   return mergeById(a, b, item => item.createdAt).sort((x, y) => x.month.localeCompare(y.month))
+}
+
+function mergeCityCosts(a: Record<string, CityCostProfile>, b: Record<string, CityCostProfile>) {
+  const merged = { ...a }
+  for (const [id, item] of Object.entries(b)) {
+    const current = merged[id]
+    if (!current || stamp(item.updatedAt) >= stamp(current.updatedAt)) merged[id] = item
+  }
+  return merged
 }
 
 export function mergeAppData(localInput: AppData, remoteInput: AppData): AppData {
@@ -122,6 +131,8 @@ export function mergeAppData(localInput: AppData, remoteInput: AppData): AppData
     researchedCountries: uniqueStrings(local.researchedCountries, remote.researchedCountries),
     visitedCountries: uniqueStrings(local.visitedCountries, remote.visitedCountries),
     researchedCities: uniqueStrings(local.researchedCities, remote.researchedCities),
+    cityCosts: mergeCityCosts(local.cityCosts, remote.cityCosts),
+    countryCompareWeights: localNewer ? local.countryCompareWeights : remote.countryCompareWeights,
     financialPlan: newest(local.financialPlan, local.financialPlan.updatedAt, remote.financialPlan, remote.financialPlan.updatedAt),
     financialHistory: mergeFinancialHistory(local.financialHistory, remote.financialHistory),
     portfolioProjects: mergePortfolio(local.portfolioProjects, remote.portfolioProjects),
