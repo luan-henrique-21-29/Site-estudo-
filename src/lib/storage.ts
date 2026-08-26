@@ -11,25 +11,56 @@ export const defaultSettings: UserSettings = {
   surface: '#151d33',
   text: '#f6f7fb',
   fontFamily: 'Inter, system-ui, sans-serif',
+  titleFontFamily: 'Poppins, Inter, system-ui, sans-serif',
+  codeFontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
   fontScale: 1,
+  headingScale: 1,
+  codeScale: 1,
+  lineHeight: 1.6,
+  cardScale: 1,
   radius: 18,
   density: 'normal',
-  animations: 'normal'
+  animations: 'normal',
+  shadow: 'soft',
+  backgroundMode: 'gradient',
+  sounds: false,
+  defaultStudyMinutes: 20
 }
 
 export const defaultData: AppData = {
   onboardingDone: false,
   displayName: '',
+  preferences: {
+    mainGoal: 'Todos',
+    sessionMinutes: 20,
+    countries: [],
+    englishLevel: 'Não sei',
+    programmingLevel: 'Nunca programei',
+    financialGoal: 'Aprender investimentos'
+  },
   favorites: [],
   completed: {},
   notes: {},
+  noteTags: {},
+  favoriteNotes: [],
   goals: [
-    { id: 'goal-english', title: 'Chegar ao inglês B2', target: 100, current: 5, unit: '%' },
-    { id: 'goal-money', title: 'Meta para morar fora', target: 30000, current: 0, unit: 'R$' },
-    { id: 'goal-code', title: 'Concluir trilha de programação', target: 100, current: 2, unit: '%' }
+    { id: 'goal-english', title: 'Chegar ao inglês B2', target: 100, current: 5, unit: '%', priority: 'high', subtasks: [] },
+    { id: 'goal-money', title: 'Meta para morar fora', target: 30000, current: 0, unit: 'R$', priority: 'high', subtasks: [] },
+    { id: 'goal-code', title: 'Concluir trilha de programação', target: 100, current: 2, unit: '%', priority: 'normal', subtasks: [] }
   ],
   relocationChecklist: {},
   studyMinutes: 0,
+  studySessions: [],
+  recent: [],
+  quizAttempts: [],
+  flashcardReviews: {},
+  notebooks: [],
+  highlights: [],
+  researchedCountries: [],
+  visitedCountries: [],
+  researchedCities: [],
+  lastVisitedPath: '/',
+  updatedAt: '',
   settings: defaultSettings
 }
 
@@ -39,14 +70,28 @@ export function loadData(): AppData {
     if (!raw) return structuredClone(defaultData)
     const parsed = JSON.parse(raw) as Partial<AppData>
     return {
-      ...defaultData,
+      ...structuredClone(defaultData),
       ...parsed,
+      preferences: { ...defaultData.preferences, ...(parsed.preferences ?? {}) },
       favorites: parsed.favorites ?? [],
       completed: parsed.completed ?? {},
       notes: parsed.notes ?? {},
+      noteTags: parsed.noteTags ?? {},
+      favoriteNotes: parsed.favoriteNotes ?? [],
+      goals: (parsed.goals ?? defaultData.goals).map(goal => ({ ...goal, priority: goal.priority ?? 'normal', subtasks: goal.subtasks ?? [] })),
       relocationChecklist: parsed.relocationChecklist ?? {},
-      settings: { ...defaultSettings, ...(parsed.settings ?? {}) },
-      goals: parsed.goals ?? defaultData.goals
+      studySessions: parsed.studySessions ?? [],
+      recent: parsed.recent ?? [],
+      quizAttempts: parsed.quizAttempts ?? [],
+      flashcardReviews: parsed.flashcardReviews ?? {},
+      notebooks: parsed.notebooks ?? [],
+      highlights: parsed.highlights ?? [],
+      researchedCountries: parsed.researchedCountries ?? [],
+      visitedCountries: parsed.visitedCountries ?? [],
+      researchedCities: parsed.researchedCities ?? [],
+      lastVisitedPath: parsed.lastVisitedPath ?? '/',
+      updatedAt: parsed.updatedAt ?? '',
+      settings: { ...defaultSettings, ...(parsed.settings ?? {}) }
     }
   } catch {
     return structuredClone(defaultData)
@@ -54,7 +99,11 @@ export function loadData(): AppData {
 }
 
 export function saveData(data: AppData) {
-  localStorage.setItem(KEY, JSON.stringify(data))
+  try {
+    localStorage.setItem(KEY, JSON.stringify(data))
+  } catch {
+    // A aplicação continua utilizável mesmo se o navegador bloquear armazenamento.
+  }
 }
 
 export function exportData(data: AppData) {

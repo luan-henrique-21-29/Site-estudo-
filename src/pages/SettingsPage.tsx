@@ -1,16 +1,80 @@
-import { useRef } from 'react'
-import { Download, RotateCcw, Upload } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Download, RotateCcw, Save, Upload, UserRound } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAppState } from '../hooks/useAppState'
-import { exportData } from '../lib/storage'
-import type { AppData } from '../types'
+import { defaultSettings, exportData } from '../lib/storage'
+import type { AppData, UserSettings } from '../types'
 
 const themes = [
-  ['Midnight','#6d5dfc','#6aa8ff','#ff5d8f','#0b1020','#151d33','#f6f7fb'],['Ocean','#2087ff','#72c4ff','#ff6b9e','#07182b','#10243d','#f4f9ff'],['Crimson','#e83a5f','#ff7b54','#ffb347','#0c0b10','#1b1721','#fff7f8'],['Purple Night','#9b5de5','#5f6fff','#f15bb5','#100b1e','#1d1532','#fbf8ff'],['Sunset','#ff6b4a','#a85cff','#ffb84d','#16101b','#28182f','#fff8f2'],['Clean','#4263eb','#7c8cff','#e64980','#f4f6fb','#ffffff','#182033'],['AMOLED','#7b61ff','#3b82f6','#ff4d8d','#000000','#0b0b10','#ffffff'],['Ice','#4c7dff','#91b7ff','#c063ff','#eef4ff','#ffffff','#152238'],['Neon Night','#6c63ff','#1f9dff','#ff3fa4','#05060d','#111529','#f5f8ff']
+  ['Midnight','#6d5dfc','#6aa8ff','#ff5d8f','#0b1020','#151d33','#f6f7fb'],
+  ['Ocean','#2087ff','#72c4ff','#ff6b9e','#07182b','#10243d','#f4f9ff'],
+  ['Crimson','#e83a5f','#ff7b54','#ffb347','#0c0b10','#1b1721','#fff7f8'],
+  ['Purple Night','#9b5de5','#5f6fff','#f15bb5','#100b1e','#1d1532','#fbf8ff'],
+  ['Sunset','#ff6b4a','#a85cff','#ffb84d','#16101b','#28182f','#fff8f2'],
+  ['Clean','#4263eb','#7c8cff','#e64980','#f4f6fb','#ffffff','#182033'],
+  ['AMOLED','#7b61ff','#3b82f6','#ff4d8d','#000000','#0b0b10','#ffffff'],
+  ['Ice','#4c7dff','#91b7ff','#c063ff','#eef4ff','#ffffff','#152238'],
+  ['Neon Night','#6c63ff','#1f9dff','#ff3fa4','#05060d','#111529','#f5f8ff']
 ] as const
 
+const uiFonts = [
+  'Inter, system-ui, sans-serif', 'Poppins, system-ui, sans-serif', 'Roboto, system-ui, sans-serif',
+  'Montserrat, system-ui, sans-serif', 'Nunito, system-ui, sans-serif', 'Open Sans, system-ui, sans-serif',
+  'Lato, system-ui, sans-serif', 'Source Sans 3, system-ui, sans-serif', 'system-ui, sans-serif'
+]
+const codeFonts = ['ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', 'Consolas, ui-monospace, monospace', 'Menlo, ui-monospace, monospace', 'monospace']
+const customKey = 'futuro-lab-custom-themes-v1'
+type ColorKey = 'primary' | 'secondary' | 'accent' | 'background' | 'surface' | 'text'
+type SavedTheme = Pick<UserSettings, 'primary'|'secondary'|'accent'|'background'|'surface'|'text'> & { name:string }
+
+function hexToHsl(hex:string){
+  const raw=hex.replace('#',''); if(raw.length!==6)return {h:0,s:0}
+  const r=parseInt(raw.slice(0,2),16)/255,g=parseInt(raw.slice(2,4),16)/255,b=parseInt(raw.slice(4,6),16)/255
+  const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min; let h=0
+  if(d){if(max===r)h=((g-b)/d)%6; else if(max===g)h=(b-r)/d+2; else h=(r-g)/d+4;h*=60;if(h<0)h+=360}
+  const l=(max+min)/2; const s=d===0?0:d/(1-Math.abs(2*l-1)); return {h,s}
+}
+function isGreenish(hex:string){const {h,s}=hexToHsl(hex);return s>.18&&h>=70&&h<=170}
+function readSavedThemes():SavedTheme[]{try{return JSON.parse(localStorage.getItem(customKey)??'[]') as SavedTheme[]}catch{return []}}
+
 export function SettingsPage(){
- const {data,updateSettings,replaceData,resetData}=useAppState(); const fileRef=useRef<HTMLInputElement>(null); const s=data.settings
- const applyTheme=(t:typeof themes[number])=>updateSettings({themeName:t[0],primary:t[1],secondary:t[2],accent:t[3],background:t[4],surface:t[5],text:t[6]})
- const importFile=async(file?:File)=>{if(!file)return; try{const parsed=JSON.parse(await file.text()) as AppData; if(!parsed.settings||!parsed.goals)throw new Error(); replaceData(parsed)}catch{alert('Backup inválido.')}}
- return <div className="page"><section className="page-header glass-panel"><div className="mega-icon">🎨</div><div><span className="eyebrow">Seu jeito</span><h1>Personalização</h1><p>Cor, fonte, tamanho, densidade e movimento ficam salvos no navegador.</p></div></section><section className="glass-panel content-panel"><h2>Temas prontos</h2><div className="theme-grid">{themes.map(t=><button key={t[0]} className={s.themeName===t[0]?'theme-card selected':'theme-card'} onClick={()=>applyTheme(t)}><span className="theme-preview" style={{background:`linear-gradient(135deg,${t[1]},${t[2]},${t[3]})`}}/><strong>{t[0]}</strong></button>)}</div></section><div className="split-grid"><section className="glass-panel content-panel"><h2>Cores customizadas</h2>{[['Principal','primary'],['Secundária','secondary'],['Destaque','accent'],['Fundo','background'],['Cards','surface'],['Texto','text']].map(([label,key])=><label className="color-row" key={key}><span>{label}</span><input type="color" value={s[key as keyof typeof s] as string} onChange={e=>updateSettings({themeName:'Custom',[key]:e.target.value})}/></label>)}</section><section className="glass-panel content-panel"><h2>Tipografia e espaço</h2><label>Fonte<select value={s.fontFamily} onChange={e=>updateSettings({fontFamily:e.target.value})}>{['Inter, system-ui, sans-serif','Poppins, system-ui, sans-serif','Roboto, system-ui, sans-serif','Montserrat, system-ui, sans-serif','Nunito, system-ui, sans-serif','Open Sans, system-ui, sans-serif','Lato, system-ui, sans-serif','system-ui, sans-serif'].map(x=><option key={x} value={x}>{x.split(',')[0]}</option>)}</select></label><label>Tamanho do texto: {Math.round(s.fontScale*100)}%<input type="range" min="0.8" max="1.5" step="0.05" value={s.fontScale} onChange={e=>updateSettings({fontScale:Number(e.target.value)})}/></label><label>Bordas: {s.radius}px<input type="range" min="0" max="32" value={s.radius} onChange={e=>updateSettings({radius:Number(e.target.value)})}/></label><label>Densidade<select value={s.density} onChange={e=>updateSettings({density:e.target.value as typeof s.density})}><option value="compact">Compacta</option><option value="normal">Normal</option><option value="spacious">Espaçosa</option></select></label><label>Animações<select value={s.animations} onChange={e=>updateSettings({animations:e.target.value as typeof s.animations})}><option value="off">Desligadas</option><option value="soft">Suaves</option><option value="normal">Normais</option><option value="more">Mais animadas</option></select></label></section></div><section className="glass-panel content-panel"><h2>Backup e dados</h2><div className="button-row"><button className="secondary-button" onClick={()=>exportData(data)}><Download size={18}/> Exportar backup</button><button className="secondary-button" onClick={()=>fileRef.current?.click()}><Upload size={18}/> Importar backup</button><input hidden ref={fileRef} type="file" accept="application/json" onChange={e=>importFile(e.target.files?.[0])}/><button className="danger-button" onClick={()=>confirm('Resetar todo o progresso local?')&&resetData()}><RotateCcw size={18}/> Resetar</button></div><small>Abordagem local-first: progresso, metas, anotações e preferências ficam no seu navegador.</small></section></div>
+  const {data,updateSettings,replaceData,resetData}=useAppState()
+  const fileRef=useRef<HTMLInputElement>(null)
+  const [savedThemes,setSavedThemes]=useState<SavedTheme[]>(readSavedThemes)
+  const [colorWarning,setColorWarning]=useState('')
+  const s=data.settings
+
+  const applyTheme=(t:typeof themes[number])=>updateSettings({themeName:t[0],primary:t[1],secondary:t[2],accent:t[3],background:t[4],surface:t[5],text:t[6]})
+  const setColor=(key:ColorKey,value:string)=>{
+    if((key==='primary'||key==='secondary'||key==='accent')&&isGreenish(value)){setColorWarning('Verde foi bloqueado nas cores principais/destaques deste projeto. Escolha outra cor.');return}
+    setColorWarning(''); updateSettings({themeName:'Custom',[key]:value} as Partial<UserSettings>)
+  }
+  const saveTheme=()=>{
+    const item:SavedTheme={name:`Meu tema ${savedThemes.length+1}`,primary:s.primary,secondary:s.secondary,accent:s.accent,background:s.background,surface:s.surface,text:s.text}
+    const next=[...savedThemes,item];setSavedThemes(next);localStorage.setItem(customKey,JSON.stringify(next))
+  }
+  const applySaved=(theme:SavedTheme)=>updateSettings({...theme,themeName:theme.name})
+  const importFile=async(file?:File)=>{if(!file)return;try{const parsed=JSON.parse(await file.text()) as AppData;if(!parsed.settings||!parsed.goals)throw new Error();replaceData(parsed)}catch{alert('Backup inválido.')}}
+  const restore=()=>updateSettings({...defaultSettings})
+
+  const colorFields:[string,ColorKey][]=[['Principal','primary'],['Secundária','secondary'],['Destaque','accent'],['Fundo','background'],['Cards','surface'],['Texto','text']]
+  return <div className="page settings-page">
+    <section className="page-header glass-panel"><div className="mega-icon">🎨</div><div><span className="eyebrow">Seu jeito</span><h1>Personalização</h1><p>Cor, tipografia, tamanho, densidade, sombras, fundo e movimento ficam salvos no navegador.</p><Link className="text-link" to="/profile"><UserRound size={16}/> Editar perfil e preferências de estudo</Link></div></section>
+
+    <section className="glass-panel content-panel"><div className="section-heading"><div><span className="eyebrow">Visual</span><h2>Temas prontos</h2></div><button className="secondary-button" onClick={saveTheme}><Save size={17}/> Duplicar tema atual</button></div><div className="theme-grid">{themes.map(t=><button key={t[0]} className={s.themeName===t[0]?'theme-card selected':'theme-card'} onClick={()=>applyTheme(t)}><span className="theme-preview" style={{background:`linear-gradient(135deg,${t[1]},${t[2]},${t[3]})`}}/><strong>{t[0]}</strong></button>)}</div>{savedThemes.length>0&&<><h3>Meus temas salvos</h3><div className="theme-grid">{savedThemes.map((t,i)=><button key={`${t.name}-${i}`} className={s.themeName===t.name?'theme-card selected':'theme-card'} onClick={()=>applySaved(t)}><span className="theme-preview" style={{background:`linear-gradient(135deg,${t.primary},${t.secondary},${t.accent})`}}/><strong>{t.name}</strong></button>)}</div></>}</section>
+
+    <div className="split-grid">
+      <section className="glass-panel content-panel"><h2>Cores customizadas</h2>{colorFields.map(([label,key])=><label className="color-row" key={key}><span>{label}</span><div className="color-value"><code>{s[key]}</code><input aria-label={`Cor ${label}`} type="color" value={s[key]} onChange={e=>setColor(key,e.target.value)}/></div></label>)}{colorWarning&&<div className="warning-box">🟠 {colorWarning}</div>}<small>Azul, roxo, laranja, vermelho, rosa e amarelo funcionam bem. Verde fica bloqueado para manter a identidade escolhida para o projeto.</small></section>
+
+      <section className="glass-panel content-panel"><h2>Tipografia</h2><label>Fonte da interface<select value={s.fontFamily} onChange={e=>updateSettings({fontFamily:e.target.value})}>{uiFonts.map(x=><option key={x} value={x}>{x.split(',')[0]}</option>)}</select></label><label>Fonte dos títulos<select value={s.titleFontFamily} onChange={e=>updateSettings({titleFontFamily:e.target.value})}>{uiFonts.map(x=><option key={x} value={x}>{x.split(',')[0]}</option>)}</select></label><label>Fonte de código<select value={s.codeFontFamily} onChange={e=>updateSettings({codeFontFamily:e.target.value})}>{codeFonts.map(x=><option key={x} value={x}>{x.split(',')[0]}</option>)}</select></label><div className="font-preview"><h3 style={{fontFamily:s.titleFontFamily}}>O futuro fica mais claro quando vira um plano.</h3><p style={{fontFamily:s.fontFamily}}>Texto de leitura confortável para aulas e explicações.</p><code style={{fontFamily:s.codeFontFamily}}>const futuro = 'em construção';</code></div></section>
+    </div>
+
+    <div className="split-grid">
+      <section className="glass-panel content-panel"><h2>Tamanho e espaço</h2><label>Texto: {Math.round(s.fontScale*100)}%<input type="range" min="0.8" max="1.5" step="0.05" value={s.fontScale} onChange={e=>updateSettings({fontScale:Number(e.target.value)})}/></label><label>Títulos: {Math.round(s.headingScale*100)}%<input type="range" min="0.85" max="1.35" step="0.05" value={s.headingScale} onChange={e=>updateSettings({headingScale:Number(e.target.value)})}/></label><label>Código: {Math.round(s.codeScale*100)}%<input type="range" min="0.8" max="1.5" step="0.05" value={s.codeScale} onChange={e=>updateSettings({codeScale:Number(e.target.value)})}/></label><label>Altura de linha: {s.lineHeight.toFixed(1)}<input type="range" min="1.3" max="2" step="0.1" value={s.lineHeight} onChange={e=>updateSettings({lineHeight:Number(e.target.value)})}/></label><label>Escala dos cards: {Math.round(s.cardScale*100)}%<input type="range" min="0.9" max="1.15" step="0.05" value={s.cardScale} onChange={e=>updateSettings({cardScale:Number(e.target.value)})}/></label><label>Bordas: {s.radius}px<input type="range" min="0" max="32" value={s.radius} onChange={e=>updateSettings({radius:Number(e.target.value)})}/></label></section>
+
+      <section className="glass-panel content-panel"><h2>Interface e movimento</h2><label>Densidade<select value={s.density} onChange={e=>updateSettings({density:e.target.value as UserSettings['density']})}><option value="compact">Compacta</option><option value="normal">Normal</option><option value="spacious">Espaçosa</option></select></label><label>Sombras<select value={s.shadow} onChange={e=>updateSettings({shadow:e.target.value as UserSettings['shadow']})}><option value="off">Desligadas</option><option value="soft">Suaves</option><option value="medium">Médias</option></select></label><label>Animações<select value={s.animations} onChange={e=>updateSettings({animations:e.target.value as UserSettings['animations']})}><option value="off">Desligadas</option><option value="soft">Suaves</option><option value="normal">Normais</option><option value="more">Mais animadas</option></select></label><label>Fundo dinâmico<select value={s.backgroundMode} onChange={e=>updateSettings({backgroundMode:e.target.value as UserSettings['backgroundMode']})}><option value="simple">Simples</option><option value="gradient">Gradiente animado</option><option value="particles">Partículas</option><option value="stars">Estrelas</option><option value="geometry">Geometria</option></select></label><label>Tempo padrão de estudo<select value={s.defaultStudyMinutes} onChange={e=>updateSettings({defaultStudyMinutes:Number(e.target.value)})}>{[5,10,20,30,45,60].map(x=><option key={x} value={x}>{x} minutos</option>)}</select></label><label className="toggle-row"><input type="checkbox" checked={s.sounds} onChange={e=>updateSettings({sounds:e.target.checked})}/><span>Sons opcionais de conclusão</span></label><small>`prefers-reduced-motion` sempre tem prioridade sobre efeitos visuais.</small></section>
+    </div>
+
+    <section className="glass-panel content-panel"><h2>Backup e dados</h2><div className="button-row"><button className="secondary-button" onClick={()=>exportData(data)}><Download size={18}/> Exportar backup</button><button className="secondary-button" onClick={()=>fileRef.current?.click()}><Upload size={18}/> Importar backup</button><input hidden ref={fileRef} type="file" accept="application/json" onChange={e=>importFile(e.target.files?.[0])}/><button className="secondary-button" onClick={restore}><RotateCcw size={18}/> Restaurar aparência</button><button className="danger-button" onClick={()=>confirm('Resetar todo o progresso local? Essa ação apaga metas, notas e histórico neste navegador.')&&resetData()}><RotateCcw size={18}/> Resetar tudo</button></div><small>Abordagem local-first: progresso, metas, anotações e preferências ficam neste navegador até você exportar o backup.</small></section>
+  </div>
 }

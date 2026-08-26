@@ -17,22 +17,76 @@ Plataforma pessoal de estudos e planejamento de futuro com inglês, investimento
 
 ## Funcionalidades
 
-- Dashboard responsivo e animado.
-- Onboarding local.
+- Dashboard simplificado, responsivo e animado.
+- Botão **Continuar de onde parei**.
+- Conta opcional com e-mail/senha ou link mágico.
+- Sincronização de progresso entre dispositivos quando o Supabase está configurado.
+- Salvamento local imediato mesmo sem login ou internet.
+- Onboarding completo e editável depois.
 - Modo caderno com dica bônus, frase da página, exemplos e desenho simples.
 - Busca global, inclusive por salários e profissões cadastradas.
-- Favoritos e anotações.
-- Revisão por dificuldade.
+- Favoritos, anotações, marca-texto, cadernos e histórico.
+- Revisão espaçada em 1, 3, 7, 14, 30 e 60 dias.
 - Metas pessoais e planejamento para morar fora.
-- Progresso com gráficos.
+- Progresso com gráficos, XP, sequência, calendário e estatísticas.
 - Temas, cores, fontes, tamanhos, densidade, bordas e animações personalizáveis.
 - Modo foco com Pomodoro e aula sugerida.
 - Playground de HTML, CSS e JavaScript com preview em iframe isolado.
-- Diretório pesquisável de cidades.
-- Comparação de países com piso por hora, equivalente mensal e conversão aproximada para BRL.
+- Diretório pesquisável de cidades e comparador de países.
 - Backup/importação local.
 - PWA e cache offline básico.
 - Pipeline de testes, build e deploy com GitHub Actions.
+
+## Login e sincronização entre dispositivos
+
+O site continua funcionando sem conta. Nesse modo, os dados ficam somente no navegador atual.
+
+Quando a sincronização em nuvem é habilitada, a mesma conta pode ser usada no celular, computador ou outro dispositivo. O JSON de progresso inclui aulas concluídas, anotações, preferências visuais, flashcards, quizzes, metas, cadernos, histórico e a última página acessada.
+
+A implementação usa **Supabase Auth + PostgreSQL com Row Level Security**. Nenhuma chave `service_role` deve ser colocada no frontend.
+
+### 1. Criar o projeto no Supabase
+
+Crie um projeto em Supabase e copie em `Project Settings → API`:
+
+- Project URL
+- public anon/publishable key
+
+### 2. Criar a tabela segura
+
+Abra o SQL Editor do Supabase e execute:
+
+```text
+supabase/schema.sql
+```
+
+O arquivo cria `study_profiles`, ativa RLS e permite que cada usuário leia e altere somente a própria linha.
+
+### 3. Configurar desenvolvimento local
+
+Copie `.env.example` para `.env.local` e preencha:
+
+```env
+VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=SUA_CHAVE_PUBLICA
+```
+
+### 4. Configurar GitHub Pages
+
+No repositório, adicione em `Settings → Secrets and variables → Actions → Repository secrets`:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+O workflow de deploy injeta essas variáveis no build. Sem elas, o site continua em modo local e a página **Conta** explica que a nuvem não está ativa.
+
+### Como a sincronização funciona
+
+1. Qualquer mudança é salva primeiro no `localStorage`.
+2. Se o usuário estiver conectado, a alteração recebe `updatedAt` e é enviada para a nuvem após um pequeno debounce.
+3. Ao entrar em outro dispositivo, o site compara a cópia local e a remota e usa a mais recente.
+4. Ao voltar para a aba, reconectar a internet ou focar a janela, a sincronização é conferida de novo.
+5. `lastVisitedPath` e `lastLessonId` permitem retomar de onde o usuário parou.
 
 ## Salários mínimos e câmbio
 
@@ -49,44 +103,29 @@ A área **Salários** possui um registro para cada país da plataforma. Quando e
 
 Países sem salário mínimo nacional único não recebem um número inventado. A interface explica quando o sistema é regional, setorial, baseado em acordos coletivos ou simplesmente não possui piso universal.
 
-Cada página de país também possui um **simulador de jornada** quando existe uma taxa horária comparável: o usuário escolhe as horas por semana e vê uma estimativa mensal na moeda local e, quando o câmbio está disponível, em reais.
+Cada página de país também possui um **simulador de jornada** quando existe uma taxa horária comparável.
 
 ## Salários por profissão
 
 A área de carreiras possui uma camada separada de dados ocupacionais. Ela não confunde salário mínimo com salário de profissão.
 
-Os primeiros conjuntos verificados incluem fontes públicas/estatísticas de:
-
-- Canadá — Job Bank / Statistics Canada;
-- Alemanha — Entgeltatlas da Bundesagentur für Arbeit;
-- Austrália — Jobs and Skills Australia / ABS;
-- Estados Unidos — Bureau of Labor Statistics (OEWS);
-- Irlanda — Central Statistics Office, com aviso explícito quando o dado é de grupo ocupacional amplo.
-
-Quando a fonte oferece faixa, o site mostra baixo/mediana/alto. Também calcula um equivalente mensal e uma conversão aproximada para reais. O período de referência e a fonte ficam visíveis para evitar tratar dado antigo como atual.
+Os primeiros conjuntos verificados incluem fontes públicas/estatísticas de Canadá, Alemanha, Austrália, Estados Unidos e Irlanda. Quando a fonte oferece faixa, o site mostra baixo/mediana/alto, equivalente mensal, conversão aproximada para reais, período de referência e fonte.
 
 ## Conversão para BRL
 
-O câmbio é buscado no navegador e não fica congelado no código. O fluxo usa:
-
-1. `open.er-api.com` com base BRL para cobertura ampla de moedas;
-2. Frankfurter como fallback, uma API pública baseada em dados de bancos centrais.
-
-As taxas ficam em cache por até seis horas no `localStorage`. Se nenhuma fonte estiver disponível para determinada moeda, a conversão aparece como indisponível em vez de usar cotação inventada.
-
-As conversões são apenas aproximações cambiais. Salário mínimo não é salário médio da profissão, e valores brutos não representam salário líquido depois de impostos.
+O câmbio é buscado no navegador e não fica congelado no código. As taxas ficam em cache por até seis horas. Se nenhuma fonte estiver disponível para determinada moeda, a conversão aparece como indisponível em vez de usar cotação inventada.
 
 ## Programação prática
 
-O **Playground** possui editores separados de HTML, CSS e JavaScript, preview em iframe com `sandbox`, botão de execução, reset e salvamento local do rascunho. Ele foi criado para acompanhar a trilha de programação desde os fundamentos até projetos.
+O **Playground** possui editores separados de HTML, CSS e JavaScript, preview em iframe com `sandbox`, botão de execução, reset e salvamento local do rascunho.
 
 ## Foco e estudo diário
 
-A página **Estudar Hoje** sugere conteúdo não concluído por matéria e duração. O botão **Modo foco** abre uma interface sem sidebar/menu inferior e oferece ciclos 25/5, 50/10 e 15/3, com timer local e acesso direto à aula completa.
+A página **Estudar Hoje** combina conteúdo novo, revisão vencida e flashcards conforme o tempo escolhido. O **Modo foco** oferece ciclos 25/5, 50/10 e duração personalizada.
 
 ## Dados dinâmicos
 
-Salários, custo de vida, câmbio, impostos e regras migratórias são tratados como dados sensíveis ao tempo. A aplicação diferencia informação estável de informação atualizável e mantém fonte/data quando um valor atual é mostrado. Quando não existe uma fonte suficientemente segura, a interface deve dizer que o dado não está disponível em vez de fabricar um valor.
+Salários, custo de vida, câmbio, impostos e regras migratórias são tratados como dados sensíveis ao tempo. Quando não existe uma fonte suficientemente segura, a interface deve informar que o dado ainda não está disponível.
 
 ## Desenvolvimento
 
@@ -103,19 +142,20 @@ npm run lint
 npm run build
 ```
 
-Os testes validam os mínimos de conteúdo, integridade de quizzes, cobertura salarial dos países, fórmulas de equivalência/conversão e consistência dos registros de salários por profissão.
-
 ## Deploy
 
 O workflow em `.github/workflows/deploy.yml` executa instalação, TypeScript/lint, testes e build. Em `main`, publica o conteúdo gerado no GitHub Pages.
 
-Para esse workflow publicar o `dist` do Vite, a fonte do GitHub Pages precisa estar configurada como **GitHub Actions** em `Settings → Pages → Build and deployment → Source`. Se estiver em **Deploy from a branch**, o Pages apenas copia/processa os arquivos-fonte do repositório e não executa o build do Vite.
+A fonte do GitHub Pages precisa estar configurada como **GitHub Actions** em `Settings → Pages → Build and deployment → Source`.
 
 ## Estrutura
 
 - `src/components` — componentes compartilhados.
 - `src/pages` — telas da aplicação.
 - `src/data` — aulas, atividades, países, carreiras e salários.
-- `src/hooks` — estado local e dados dinâmicos como câmbio.
-- `src/lib` — persistência, cálculos e utilidades.
+- `src/hooks` — estado, autenticação e dados dinâmicos.
+- `src/services` — sincronização em nuvem.
+- `src/lib` — persistência, Supabase, cálculos e utilidades.
+- `supabase/schema.sql` — banco e políticas RLS para conta/sincronização.
+- `.env.example` — variáveis necessárias para ativar a nuvem.
 - `REQUIREMENTS.md` — requisitos completos usados como base do projeto.
