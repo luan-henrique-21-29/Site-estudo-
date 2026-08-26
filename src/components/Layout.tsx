@@ -10,6 +10,7 @@ const nav = [
   ['/countries', Globe2, 'Países'],
   ['/salaries', WalletCards, 'Salários'],
   ['/course/programming', Code2, 'Programação'],
+  ['/playground', Code2, 'Playground'],
   ['/careers', BriefcaseBusiness, 'Carreiras'],
   ['/future', Target, 'Meu Futuro'],
   ['/review', BookOpen, 'Revisar'],
