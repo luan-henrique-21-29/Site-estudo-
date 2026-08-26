@@ -79,6 +79,7 @@ export interface AppData {
   completed: Record<string, { completedAt: string; difficulty: 'hard' | 'normal' | 'easy' }>
   notes: Record<string, string>
   goals: Goal[]
+  relocationChecklist: Record<string, boolean>
   studyMinutes: number
   settings: UserSettings
 }
