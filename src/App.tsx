@@ -16,9 +16,11 @@ import { FuturePage } from './pages/FuturePage'
 import { NotebookPage } from './pages/NotebookPage'
 import { ToolsPage } from './pages/ToolsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { FlashcardsPage } from './pages/FlashcardsPage'
+import { QuizzesPage } from './pages/QuizzesPage'
 
 function NotFound(){return <div className="page"><div className="empty glass-panel"><h1>404</h1><p>Essa página resolveu fazer intercâmbio e ainda não voltou. 😅</p><a href="#/">Voltar ao início</a></div></div>}
 
 export default function App(){
- return <HashRouter><Onboarding/><Routes><Route element={<Layout/>}><Route index element={<Home/>}/><Route path="today" element={<StudyToday/>}/><Route path="course/:course" element={<CoursePage/>}/><Route path="lesson/:id" element={<LessonPage/>}/><Route path="countries" element={<CountriesPage/>}/><Route path="countries/:id" element={<CountryPage/>}/><Route path="careers" element={<CareersPage/>}/><Route path="future" element={<FuturePage/>}/><Route path="review" element={<ReviewPage/>}/><Route path="notebook" element={<NotebookPage/>}/><Route path="favorites" element={<FavoritesPage/>}/><Route path="progress" element={<ProgressPage/>}/><Route path="tools" element={<ToolsPage/>}/><Route path="search" element={<SearchPage/>}/><Route path="settings" element={<SettingsPage/>}/><Route path="*" element={<NotFound/>}/></Route></Routes></HashRouter>
+ return <HashRouter><Onboarding/><Routes><Route element={<Layout/>}><Route index element={<Home/>}/><Route path="today" element={<StudyToday/>}/><Route path="course/:course" element={<CoursePage/>}/><Route path="lesson/:id" element={<LessonPage/>}/><Route path="countries" element={<CountriesPage/>}/><Route path="countries/:id" element={<CountryPage/>}/><Route path="careers" element={<CareersPage/>}/><Route path="future" element={<FuturePage/>}/><Route path="review" element={<ReviewPage/>}/><Route path="flashcards" element={<FlashcardsPage/>}/><Route path="quizzes" element={<QuizzesPage/>}/><Route path="notebook" element={<NotebookPage/>}/><Route path="favorites" element={<FavoritesPage/>}/><Route path="progress" element={<ProgressPage/>}/><Route path="tools" element={<ToolsPage/>}/><Route path="search" element={<SearchPage/>}/><Route path="settings" element={<SettingsPage/>}/><Route path="*" element={<NotFound/>}/></Route></Routes></HashRouter>
 }
