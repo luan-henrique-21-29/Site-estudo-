@@ -248,6 +248,34 @@ export interface CodeChallengeProgress {
   updatedAt: string
 }
 
+export interface CityCostProfile {
+  id: string
+  countryId: string
+  city: string
+  roomRent: number
+  apartmentRent: number
+  food: number
+  transport: number
+  utilities: number
+  internet: number
+  phone: number
+  leisure: number
+  sourceName: string
+  sourceUrl: string
+  publishedAt?: string
+  retrievedAt: string
+  updatedAt: string
+}
+
+export interface CountryCompareWeights {
+  salary: number
+  safety: number
+  climate: number
+  language: number
+  immigration: number
+  cost: number
+}
+
 export interface AppData {
   version: number
   onboardingDone: boolean
@@ -272,6 +300,8 @@ export interface AppData {
   researchedCountries: string[]
   visitedCountries: string[]
   researchedCities: string[]
+  cityCosts: Record<string, CityCostProfile>
+  countryCompareWeights: CountryCompareWeights
   financialPlan: FinancialPlan
   financialHistory: FinancialHistoryEntry[]
   portfolioProjects: PortfolioProject[]
