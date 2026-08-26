@@ -1,97 +1,28 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Play, RotateCcw, Save, Sparkles } from 'lucide-react'
-
-const STORAGE_KEY = 'futuro-lab-playground-v1'
+import { KeyboardEvent, useEffect, useMemo, useState } from 'react'
+import { Download, Expand, Minimize, Play, RotateCcw, Save, Sparkles, TriangleAlert } from 'lucide-react'
+import { useAppState } from '../hooks/useAppState'
 
 const starter = {
-  html: `<main class="card">
-  <p class="eyebrow">Meu primeiro projeto</p>
-  <h1>Olá, mundo! 👋</h1>
-  <p id="message">Edite o código e aperte Executar.</p>
-  <button id="action">Clique aqui</button>
-</main>`,
-  css: `* { box-sizing: border-box; }
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  font-family: system-ui, sans-serif;
-  background: #0b1020;
-  color: #f6f7fb;
-}
-.card {
-  width: min(560px, 90%);
-  padding: 32px;
-  border-radius: 24px;
-  background: #151d33;
-  box-shadow: 0 24px 70px #0007;
-}
-.eyebrow { color: #6aa8ff; font-weight: 800; }
-button {
-  border: 0;
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-weight: 800;
-  color: white;
-  background: linear-gradient(135deg, #6d5dfc, #6aa8ff);
-  cursor: pointer;
-}`,
-  js: `const button = document.querySelector('#action');
-const message = document.querySelector('#message');
-
-button.addEventListener('click', () => {
-  message.textContent = 'Funcionou! Você executou JavaScript 🎉';
-});`
+  html: `<main class="card">\n  <p class="eyebrow">Meu primeiro projeto</p>\n  <h1>Olá, mundo! 👋</h1>\n  <p id="message">Edite o código e aperte Executar.</p>\n  <button id="action">Clique aqui</button>\n</main>`,
+  css: `* { box-sizing: border-box; }\nbody {\n  margin: 0;\n  min-height: 100vh;\n  display: grid;\n  place-items: center;\n  font-family: system-ui, sans-serif;\n  background: #0b1020;\n  color: #f6f7fb;\n}\n.card {\n  width: min(560px, 90%);\n  padding: 32px;\n  border-radius: 24px;\n  background: #151d33;\n}\n.eyebrow { color: #6aa8ff; font-weight: 800; }\nbutton {\n  border: 0;\n  border-radius: 12px;\n  padding: 12px 16px;\n  font-weight: 800;\n  color: white;\n  background: linear-gradient(135deg, #6d5dfc, #6aa8ff);\n}`,
+  javascript: `const button = document.querySelector('#action');\nconst message = document.querySelector('#message');\n\nbutton.addEventListener('click', () => {\n  message.textContent = 'Funcionou! Você executou JavaScript 🎉';\n});`
 }
 
-type CodeState = typeof starter
-
-function readSaved(): CodeState {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '') as Partial<CodeState>
-    return { html: parsed.html ?? starter.html, css: parsed.css ?? starter.css, js: parsed.js ?? starter.js }
-  } catch {
-    return starter
-  }
-}
-
-function makeDocument(code: CodeState) {
-  const safeCss = code.css.replace(/<\/style/gi, '<\\/style')
-  const safeJs = code.js.replace(/<\/script/gi, '<\\/script')
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${safeCss}</style></head><body>${code.html}<script>window.addEventListener('error',e=>{document.body.insertAdjacentHTML('beforeend','<pre style="white-space:pre-wrap;padding:12px;color:#ff8a8a">Erro: '+String(e.message).replace(/[<>&]/g,'')+'</pre>')});${safeJs}<\/script></body></html>`
-}
+type PanelKey='html'|'css'|'javascript'
+function makeDocument(code:{html:string;css:string;javascript:string}){const safeCss=code.css.replace(/<\/style/gi,'<\\/style');const safeJs=code.javascript.replace(/<\/script/gi,'<\\/script');return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${safeCss}</style></head><body>${code.html}<script>window.addEventListener('error',e=>{const pre=document.createElement('pre');pre.style.cssText='white-space:pre-wrap;padding:12px;color:#ff8a8a';pre.textContent='Erro: '+e.message;document.body.appendChild(pre)});${safeJs}<\/script></body></html>`}
+function lines(value:string){return Array.from({length:Math.max(1,value.split('\n').length)},(_,i)=>i+1).join('\n')}
+function basicError(js:string){try{new Function(js);return ''}catch(error){return error instanceof Error?error.message:'Erro de JavaScript'}}
 
 export function PlaygroundPage(){
-  const initial = useMemo(readSaved, [])
-  const [html,setHtml]=useState(initial.html)
-  const [css,setCss]=useState(initial.css)
-  const [js,setJs]=useState(initial.js)
-  const [srcDoc,setSrcDoc]=useState(()=>makeDocument(initial))
-  const [saved,setSaved]=useState(false)
-
-  const run=()=>setSrcDoc(makeDocument({html,css,js}))
-  const reset=()=>{setHtml(starter.html);setCss(starter.css);setJs(starter.js);setSrcDoc(makeDocument(starter));localStorage.removeItem(STORAGE_KEY);setSaved(false)}
-  const save=()=>{localStorage.setItem(STORAGE_KEY,JSON.stringify({html,css,js}));setSaved(true)}
-
-  useEffect(()=>{setSaved(false)},[html,css,js])
-
-  return <div className="page playground-page">
-    <section className="page-header glass-panel"><div className="mega-icon">🧑‍💻</div><div><span className="eyebrow">Programação na prática</span><h1>Playground de código</h1><p>Escreva HTML, CSS e JavaScript e veja o resultado no próprio site. Seu rascunho pode ficar salvo somente neste navegador.</p></div></section>
-
-    <section className="playground-toolbar glass-panel">
-      <div><strong>Laboratório</strong><small>O preview roda em um iframe isolado para reduzir riscos.</small></div>
-      <div className="button-row"><button className="primary-button" onClick={run}><Play size={17}/> Executar</button><button className="secondary-button" onClick={save}><Save size={17}/> {saved?'Salvo':'Salvar'}</button><button className="secondary-button" onClick={reset}><RotateCcw size={17}/> Resetar</button></div>
-    </section>
-
-    <section className="editor-grid">
-      <label className="code-panel glass-panel"><span><b>HTML</b><small>estrutura</small></span><textarea spellCheck={false} value={html} onChange={e=>setHtml(e.target.value)} aria-label="Editor HTML"/></label>
-      <label className="code-panel glass-panel"><span><b>CSS</b><small>visual</small></span><textarea spellCheck={false} value={css} onChange={e=>setCss(e.target.value)} aria-label="Editor CSS"/></label>
-      <label className="code-panel glass-panel"><span><b>JavaScript</b><small>comportamento</small></span><textarea spellCheck={false} value={js} onChange={e=>setJs(e.target.value)} aria-label="Editor JavaScript"/></label>
-    </section>
-
-    <section className="preview-panel glass-panel"><div className="preview-head"><div><Sparkles size={17}/><strong>Preview</strong></div><span>Resultado ao clicar em Executar</span></div><iframe title="Preview do código" sandbox="allow-scripts" srcDoc={srcDoc}/></section>
-
-    <section className="split-grid"><article className="glass-panel content-panel"><h2>💡 Como estudar aqui</h2><ol><li>Mude uma coisa pequena.</li><li>Tente prever o que vai acontecer.</li><li>Aperte <strong>Executar</strong>.</li><li>Se quebrar, compare o erro com a última mudança.</li></ol></article><article className="glass-panel content-panel"><h2>🎯 Desafios rápidos</h2><p>Troque o título, crie outro botão, mude o tamanho do card e faça o JavaScript alterar uma cor ou adicionar um novo elemento.</p><small>Quebrar o código aqui faz parte do estudo. O botão Resetar traz o exemplo inicial de volta.</small></article></section>
-  </div>
+  const {data,savePlaygroundState,recordRecent}=useAppState(); const initial=data.playgroundState
+  const [html,setHtml]=useState(initial.html||starter.html); const [css,setCss]=useState(initial.css||starter.css); const [javascript,setJavascript]=useState(initial.javascript||starter.javascript); const [srcDoc,setSrcDoc]=useState(()=>makeDocument({html:initial.html||starter.html,css:initial.css||starter.css,javascript:initial.javascript||starter.javascript})); const [saved,setSaved]=useState(true); const [fullscreen,setFullscreen]=useState(false); const [error,setError]=useState('')
+  const state=useMemo(()=>({html,css,javascript}),[html,css,javascript])
+  useEffect(()=>{recordRecent({id:'playground',type:'tool',title:'Playground de código',path:'/playground'})},[])
+  useEffect(()=>{setSaved(false);const timer=window.setTimeout(()=>{savePlaygroundState(state);setSaved(true)},650);return()=>window.clearTimeout(timer)},[html,css,javascript])
+  const run=()=>{const issue=basicError(javascript);setError(issue);setSrcDoc(makeDocument(state))}
+  const reset=()=>{setHtml(starter.html);setCss(starter.css);setJavascript(starter.javascript);setSrcDoc(makeDocument(starter));setError('');savePlaygroundState(starter);setSaved(true)}
+  const download=()=>{const blob=new Blob([makeDocument(state)],{type:'text/html'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='meu-projeto-futuro-lab.html';a.click();URL.revokeObjectURL(url)}
+  const tab=(event:KeyboardEvent<HTMLTextAreaElement>,value:string,setter:(v:string)=>void)=>{if(event.key!=='Tab')return;event.preventDefault();const el=event.currentTarget;const start=el.selectionStart,end=el.selectionEnd;const next=value.slice(0,start)+'  '+value.slice(end);setter(next);requestAnimationFrame(()=>{el.selectionStart=el.selectionEnd=start+2})}
+  const panel=(key:PanelKey,label:string,value:string,setter:(v:string)=>void)=><label className="code-panel glass-panel"><span><b>{label}</b><small>{key==='html'?'estrutura':key==='css'?'visual':'comportamento'}</small></span><div className="code-editor-with-lines"><pre aria-hidden="true">{lines(value)}</pre><textarea spellCheck={false} value={value} onChange={e=>setter(e.target.value)} onKeyDown={e=>tab(e,value,setter)} aria-label={`Editor ${label}`}/></div></label>
+  return <div className={fullscreen?'page playground-page playground-fullscreen':'page playground-page'}><section className="page-header glass-panel"><div className="mega-icon">🧑‍💻</div><div><span className="eyebrow">Programação na prática</span><h1>Playground de código</h1><p>HTML, CSS e JavaScript com preview isolado. O rascunho salva automaticamente e sincroniza com sua conta.</p></div></section><section className="playground-toolbar glass-panel"><div><strong>Laboratório</strong><small>{saved?'💾 Salvo':'⏳ Salvando…'} • Tab adiciona indentação.</small></div><div className="button-row"><button className="primary-button" onClick={run}><Play size={17}/> Executar</button><button className="secondary-button" onClick={()=>{savePlaygroundState(state);setSaved(true)}}><Save size={17}/> Salvar</button><button className="secondary-button" onClick={download}><Download size={17}/> Baixar projeto</button><button className="secondary-button" onClick={()=>setFullscreen(v=>!v)}>{fullscreen?<Minimize size={17}/>:<Expand size={17}/>} {fullscreen?'Sair da tela cheia':'Tela cheia'}</button><button className="secondary-button" onClick={reset}><RotateCcw size={17}/> Resetar</button></div></section>{error&&<div className="warning-box"><TriangleAlert size={17}/> JavaScript: {error}. O preview ainda pode ser executado para você investigar o erro.</div>}<section className="editor-grid">{panel('html','HTML',html,setHtml)}{panel('css','CSS',css,setCss)}{panel('javascript','JavaScript',javascript,setJavascript)}</section><section className="preview-panel glass-panel"><div className="preview-head"><div><Sparkles size={17}/><strong>Preview</strong></div><span>Resultado ao clicar em Executar</span></div><iframe title="Preview do código" sandbox="allow-scripts" srcDoc={srcDoc}/></section><section className="split-grid"><article className="glass-panel content-panel"><h2>💡 Como estudar aqui</h2><ol><li>Mude uma coisa pequena.</li><li>Tente prever o resultado.</li><li>Execute.</li><li>Se quebrar, leia o erro e compare com a última mudança.</li></ol></article><article className="glass-panel content-panel"><h2>🎯 Próxima prática</h2><p>Quando quiser exercícios com testes automáticos, abra os desafios de código.</p><a className="secondary-button" href="#/code-challenges">Abrir desafios</a></article></section></div>
 }
