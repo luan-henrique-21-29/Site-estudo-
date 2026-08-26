@@ -1,5 +1,6 @@
 import { ExternalLink, RefreshCw, WalletCards } from 'lucide-react'
 import { wageByCountry } from '../data/wages'
+import { wageSource } from '../data/wageSourceOverrides'
 import { useFxRates } from '../hooks/useFxRates'
 import { convertNativeToBRL, formatBRL, formatMoney, hourlyEquivalent, isDerivedHourly, isDerivedMonthly, monthlyEquivalent } from '../lib/wageMath'
 
@@ -23,6 +24,7 @@ export function WagePanel({ countryId }: { countryId: string }) {
   const wage = wageByCountry[countryId]
   const fx = useFxRates()
   if (!wage) return null
+  const source = wageSource(wage.countryId, wage.source)
 
   const hourly = hourlyEquivalent(wage)
   const monthly = monthlyEquivalent(wage)
@@ -48,7 +50,7 @@ export function WagePanel({ countryId }: { countryId: string }) {
     <div className="wage-context"><p><strong>Escopo:</strong> {wage.scope}</p><p><strong>Importante:</strong> {wage.note}</p>{wage.effectiveFrom&&<p><strong>Vigente desde:</strong> {dateLabel(wage.effectiveFrom)}</p>}</div>
 
     <div className="wage-footer">
-      <a href={wage.source.url} target="_blank" rel="noreferrer">Fonte do salário: {wage.source.label}<ExternalLink size={14}/></a>
+      <a href={source.url} target="_blank" rel="noreferrer">Fonte do salário: {source.label}<ExternalLink size={14}/></a>
       <span>Salário conferido em {dateLabel(wage.updatedAt)}</span>
     </div>
 
