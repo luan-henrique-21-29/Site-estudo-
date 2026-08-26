@@ -1,7 +1,7 @@
 {
   "name": "futuro-lab",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "lint": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
