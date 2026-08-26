@@ -1,0 +1,11 @@
+{
+  "name": "Futuro Lab",
+  "short_name": "FuturoLab",
+  "description": "Plataforma pessoal de estudos, carreira e vida no exterior.",
+  "start_url": "/Site-estudo-/",
+  "scope": "/Site-estudo-/",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#6d5dfc",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
