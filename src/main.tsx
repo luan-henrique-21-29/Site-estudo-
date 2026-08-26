@@ -6,6 +6,7 @@ import './styles.css'
 import './activities.css'
 import './salaries.css'
 import './playground.css'
+import './career-salaries.css'
 
 createRoot(document.getElementById('root')!).render(<StrictMode><AppStateProvider><App/></AppStateProvider></StrictMode>)
 
