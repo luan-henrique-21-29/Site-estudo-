@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ExternalLink, RefreshCw, WalletCards } from 'lucide-react'
 import { wageByCountry } from '../data/wages'
 import { wageSource } from '../data/wageSourceOverrides'
@@ -23,6 +24,7 @@ const systemLabel = {
 export function WagePanel({ countryId }: { countryId: string }) {
   const wage = wageByCountry[countryId]
   const fx = useFxRates()
+  const [customHours,setCustomHours]=useState(20)
   if (!wage) return null
   const source = wageSource(wage.countryId, wage.source)
 
@@ -30,6 +32,8 @@ export function WagePanel({ countryId }: { countryId: string }) {
   const monthly = monthlyEquivalent(wage)
   const hourlyBRL = convertNativeToBRL(hourly, wage.currency, fx.rates)
   const monthlyBRL = convertNativeToBRL(monthly, wage.currency, fx.rates)
+  const customMonthly = hourly==null ? undefined : hourly * Math.max(0,customHours) * 52 / 12
+  const customMonthlyBRL = convertNativeToBRL(customMonthly,wage.currency,fx.rates)
   const hasComparableNumbers = hourly != null || monthly != null
 
   return <section className="glass-panel wage-panel">
@@ -45,6 +49,7 @@ export function WagePanel({ countryId }: { countryId: string }) {
       </div>
       {(wage.paymentsPerYear??12)!==12&&wage.monthly!=null&&<p className="wage-callout">📅 O piso oficial é {formatMoney(wage.monthly,wage.currency)} por pagamento, com <strong>{wage.paymentsPerYear} pagamentos por ano</strong>. Para comparar com outros países, o valor mensal acima distribui o total anual por 12 meses.</p>}
       {wage.standardHoursPerWeek&&<p className="muted">Conversões estimadas usam {wage.standardHoursPerWeek.toLocaleString('pt-BR')} h/semana quando a fonte não fornece diretamente hora ou mês.</p>}
+      {hourly!=null&&<div className="wage-simulator"><div><span className="eyebrow">Simulador de jornada</span><h3>Quanto daria trabalhando {customHours} h/semana?</h3><p>Útil para comparar trabalho parcial, estudos ou uma jornada diferente da referência.</p></div><label>Horas por semana<input type="number" min="1" max="80" value={customHours} onChange={e=>setCustomHours(Math.min(80,Math.max(0,Number(e.target.value))))}/></label><div className="wage-sim-result"><strong>{formatMoney(customMonthly,wage.currency,wage.currency==='JPY'||wage.currency==='KRW'||wage.currency==='HUF'?0:2)}/mês</strong>{customMonthlyBRL!=null&&<span>≈ {formatBRL(customMonthlyBRL)}/mês</span>}</div></div>}
     </> : <div className="wage-no-number"><strong>Não existe um único número nacional correto para mostrar.</strong><p>{wage.note}</p></div>}
 
     <div className="wage-context"><p><strong>Escopo:</strong> {wage.scope}</p><p><strong>Importante:</strong> {wage.note}</p>{wage.effectiveFrom&&<p><strong>Vigente desde:</strong> {dateLabel(wage.effectiveFrom)}</p>}</div>
