@@ -28,6 +28,7 @@ export const defaultData: AppData = {
     { id: 'goal-money', title: 'Meta para morar fora', target: 30000, current: 0, unit: 'R$' },
     { id: 'goal-code', title: 'Concluir trilha de programação', target: 100, current: 2, unit: '%' }
   ],
+  relocationChecklist: {},
   studyMinutes: 0,
   settings: defaultSettings
 }
@@ -35,16 +36,20 @@ export const defaultData: AppData = {
 export function loadData(): AppData {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return defaultData
+    if (!raw) return structuredClone(defaultData)
     const parsed = JSON.parse(raw) as Partial<AppData>
     return {
       ...defaultData,
       ...parsed,
+      favorites: parsed.favorites ?? [],
+      completed: parsed.completed ?? {},
+      notes: parsed.notes ?? {},
+      relocationChecklist: parsed.relocationChecklist ?? {},
       settings: { ...defaultSettings, ...(parsed.settings ?? {}) },
       goals: parsed.goals ?? defaultData.goals
     }
   } catch {
-    return defaultData
+    return structuredClone(defaultData)
   }
 }
 
