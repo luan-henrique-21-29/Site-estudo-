@@ -5,6 +5,7 @@ import { AppStateProvider } from './hooks/useAppState'
 import './styles.css'
 import './activities.css'
 import './salaries.css'
+import './playground.css'
 
 createRoot(document.getElementById('root')!).render(<StrictMode><AppStateProvider><App/></AppStateProvider></StrictMode>)
 
