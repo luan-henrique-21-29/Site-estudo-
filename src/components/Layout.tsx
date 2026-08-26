@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { BookOpen, BriefcaseBusiness, ChartNoAxesCombined, CircleUserRound, Code2, Globe2, GraduationCap, Heart, Home, Landmark, NotebookPen, Search, Settings, Sparkles, Target, Wrench } from 'lucide-react'
+import { BookOpen, Brain, BriefcaseBusiness, ChartNoAxesCombined, CircleUserRound, Code2, Globe2, GraduationCap, Heart, Home, Landmark, ListChecks, NotebookPen, Search, Settings, Sparkles, Target, Wrench } from 'lucide-react'
 import { AnimatedBackground } from './AnimatedBackground'
 
 const nav = [
@@ -12,6 +12,8 @@ const nav = [
   ['/careers', BriefcaseBusiness, 'Carreiras'],
   ['/future', Target, 'Meu Futuro'],
   ['/review', BookOpen, 'Revisar'],
+  ['/flashcards', Brain, 'Flashcards'],
+  ['/quizzes', ListChecks, 'Quizzes'],
   ['/notebook', NotebookPen, 'Caderno'],
   ['/favorites', Heart, 'Favoritos'],
   ['/progress', ChartNoAxesCombined, 'Progresso'],
